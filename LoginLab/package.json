@@ -34,7 +34,6 @@
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^9.2.0",
-    "netlify-cli": "^27.10.2",
     "pg-mem": "^3.0.14",
     "prettier": "^3.9.9",
     "tailwindcss": "^4.1.0",

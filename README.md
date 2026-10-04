@@ -120,7 +120,7 @@ To create the first hosted administrator, obtain the production database connect
 npm run cloud:admin
 ```
 
-The command asks for a username and hidden password, and refuses once an administrator exists. The local administrator account does not automatically transfer to the hosted database. Set up the hosted administrator through this private command; additional users can register or be created by an administrator. Local SQLite remains available for offline development.
+The command asks for a username and hidden password, and refuses once an administrator exists. The local administrator account does not automatically transfer to the hosted database. With explicit authorization, use npm run cloud:import-admin -- --username YOUR_USERNAME with the private NETLIFY_DB_URL configured. It transfers only the selected administrator identity and salted password hash, refuses when a hosted administrator exists, and transfers no sessions or audit history. Set up the hosted administrator through this private command; additional users can register or be created by an administrator. Local SQLite remains available for offline development.
 
 ## Operational limits
 

@@ -6,7 +6,7 @@ import path from "node:path";
 import { CloudPortal } from "../../server/cloud.js";
 
 let service: Promise<CloudPortal> | undefined;
-async function portal() {
+async function portal(context: Context) {
   if (!service)
     service = (async () => {
       const connectionString =
@@ -21,6 +21,7 @@ async function portal() {
       const origins = [
         ...new Set(
           [
+            context.site.url,
             process.env.URL,
             process.env.DEPLOY_PRIME_URL,
             process.env.DEPLOY_URL,
@@ -28,10 +29,8 @@ async function portal() {
           ].filter((s): s is string => !!s),
         ),
       ];
-      const html = await readFile(
-        path.join(process.cwd(), "dist", "index.html"),
-        "utf8",
-      );
+      const html = await readFile(path.join(process.cwd(), "dist", "index.html"), "utf8")
+        .catch(() => readFile(path.join(process.cwd(), "LoginLab", "dist", "index.html"), "utf8"));
       return new CloudPortal(pool, origins, html);
     })().catch((e) => {
       service = undefined;
@@ -43,7 +42,7 @@ async function portal() {
 export default async function handler(request: Request, context: Context) {
   try {
     // Netlify supplies context.ip. Never use browser-supplied forwarded headers.
-    return await (await portal()).handle(request, context.ip || "unknown");
+    return await (await portal(context)).handle(request, context.ip || "unknown");
   } catch {
     return new Response(
       JSON.stringify({ message: "The service is temporarily unavailable." }),
