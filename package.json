@@ -1,0 +1,15 @@
+{
+  "name": "digital-vault-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix LoginLab run dev",
+    "build": "npm --prefix LoginLab run build",
+    "start": "npm --prefix LoginLab start",
+    "test": "npm --prefix LoginLab test",
+    "typecheck": "npm --prefix LoginLab run typecheck",
+    "db:init": "npm --prefix LoginLab run db:init",
+    "admin:setup": "npm --prefix LoginLab run admin:setup",
+    "cloud:admin": "npm --prefix LoginLab run cloud:admin",
+    "cloud:import-admin": "npm --prefix LoginLab run cloud:import-admin --"
+  }
+}

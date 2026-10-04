@@ -1,0 +1,14 @@
+node_modules/
+.env
+LoginLab/dist/
+LoginLab/dist-server/
+LoginLab/data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.verification/
+
+.netlify/
+*.env
+*.pem
+*.key

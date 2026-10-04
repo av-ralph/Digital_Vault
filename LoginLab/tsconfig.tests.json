@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.server.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "server/**/*.ts",
+    "tests/**/*.ts",
+    "netlify/functions/**/*.ts"
+  ],
+  "exclude": []
+}
