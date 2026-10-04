@@ -1019,10 +1019,9 @@ export default function App() {
                       )
                     )}
                     <p className="caption">
-                      Password contents are never retained. Local requests
-                      normally display a loopback IP. Only explicitly
-                      configured, known reverse proxies can supply forwarded
-                      client addresses.
+                      {session.realtime === "poll"
+                        ? "Passwords are never retained. Login activity is visible only to authorized administrators."
+                        : "Passwords are never retained. Local requests normally display a loopback IP; forwarded client addresses are accepted only from explicitly configured proxies."}
                     </p>
                   </section>
                 </>

@@ -1,5 +1,7 @@
 # Digital_Vault — authentication and security monitoring
 
+Live portal: https://my-digital-vault.netlify.app/ · GitHub: https://github.com/av-ralph/Digital_Vault
+
 A local portal with real registered accounts, role-based access, SQLite persistence, and an administrator-only login audit dashboard. The database starts empty. No accounts, credentials, password lists, or login activity are seeded. The previous guessing/simulation features and educational challenge endpoints have been removed.
 
 ## Windows setup
@@ -132,3 +134,5 @@ Design references: [OWASP authentication guidance](https://cheatsheetseries.owas
 Administrator sign-in is available at `/admin/login`. Successful administrator authentication opens monitoring directly; standard accounts cannot access monitoring or administration. The interface uses a public-service inspired navy and white design with Digital_Vault branding. It does not represent a government agency.
 
 If the username chosen during initial administrator setup already belongs to a registered account, setup promotes that existing account, securely replaces its password with the entered password, and invalidates its prior sessions. This is available only through the local one-time setup command before any administrator exists.
+
+Hosted verification: Netlify initially published commit c518a4f with one server function and one schema-only database migration. The authorized administrator account was transferred privately using its existing salt and hash; no plaintext password, sessions, or audit history were transferred. Hosted administrator login, monitoring, redacted audit metadata, administration-page loading, logout, post-logout redirects, and anonymous rejection by the protected monitoring APIs were verified. The portal owner confirmed rotation of both database connection credentials after a dashboard reveal appeared in diagnostic output; temporary local connection-secret files were deleted.
