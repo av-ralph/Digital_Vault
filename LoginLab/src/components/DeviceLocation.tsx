@@ -1,3 +1,4 @@
+import { requestDevicePosition } from "../devicePosition";
 import { useEffect, useRef, useState } from "react";
 export type BrowserLocation = {
   consent: true;
@@ -17,14 +18,17 @@ export function OptionalLocation({
     [locating, setLocating] = useState(false),
     [shared, setShared] = useState(false);
   const generation = useRef(0);
+  const cancelRequest = useRef<(() => void) | null>(null);
   useEffect(
     () => () => {
       generation.current++;
+      cancelRequest.current?.();
     },
     [],
   );
   function clear() {
     generation.current++;
+    cancelRequest.current?.();
     setLocating(false);
     setShared(false);
     setStatus(
@@ -39,11 +43,21 @@ export function OptionalLocation({
       );
       return;
     }
+    cancelRequest.current?.();
+    onChange(null);
+    setShared(false);
     const token = ++generation.current;
     setLocating(true);
     setStatus("Waiting for location permission...");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
+    cancelRequest.current = requestDevicePosition({
+      geo: navigator.geolocation,
+      fallback: () => {
+        if (token === generation.current)
+          setStatus(
+            "High-accuracy location unavailable. Trying the browser's standard location method...",
+          );
+      },
+      ready: (position) => {
         if (token !== generation.current) return;
         const { latitude, longitude, accuracy } = position.coords;
         onChange({
@@ -61,21 +75,20 @@ export function OptionalLocation({
             " metres.",
         );
       },
-      (error) => {
+      failed: (code) => {
         if (token !== generation.current) return;
         onChange(null);
         setLocating(false);
         setShared(false);
         setStatus(
-          error.code === 1
-            ? "Permission declined. You can sign in using the IP estimate only."
-            : error.code === 3
-              ? "Location request timed out. You can still sign in or try again."
-              : "Your device could not provide a location. You can still sign in.",
+          code === 1
+            ? "Location permission is blocked. Allow Location for this site in your browser's site settings, then try again. You can still sign in."
+            : code === 3
+              ? "Your browser did not return a location after both attempts. Check that location services are enabled on your device, or open this site in Chrome, Edge or your phone's browser. You can still sign in."
+              : "The browser could not obtain a device position. Check your device's location services and browser permissions, or try a phone. You can still sign in.",
         );
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
+    });
   }
   return (
     <section
@@ -111,6 +124,27 @@ export function OptionalLocation({
           {locating ? "Cancel location request" : "Remove location"}
         </button>
       )}
+      <details
+        className="location-help"
+        open={status.startsWith("Location permission is blocked")}
+      >
+        <summary>Location not working?</summary>
+        <p>
+          Allow Location in this site's browser settings. On Windows, check
+          Settings &gt; Privacy &amp; security &gt; Location, including access
+          for desktop apps. Embedded browsers may not have a location provider;
+          open{" "}
+          <a
+            href="https://my-digital-vault.netlify.app/login"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Digital_Vault
+          </a>{" "}
+          in Chrome, Edge or a phone browser. The website cannot turn on your
+          device's location services.
+        </p>
+      </details>
       <p className="caption" role="status">
         {status}
       </p>
