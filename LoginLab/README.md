@@ -1,8 +1,8 @@
 # Digital_Vault — authentication and security monitoring
 
-Live portal: https://my-digital-vault.netlify.app/ · GitHub: https://github.com/av-ralph/Digital_Vault
+[Live portal](https://my-digital-vault.netlify.app/) | [GitHub repository](https://github.com/av-ralph/Digital_Vault)
 
-A local portal with real registered accounts, role-based access, SQLite persistence, and an administrator-only login audit dashboard. The database starts empty. No accounts, credentials, password lists, or login activity are seeded. The previous guessing/simulation features and educational challenge endpoints have been removed.
+An authentication portal with real registered accounts, role-based access, and an administrator-only login audit dashboard. Local development uses React, TypeScript, Express and SQLite; the hosted site uses Netlify Functions and PostgreSQL. The database starts empty. No accounts, credentials, password lists, or login activity are seeded. The previous guessing/simulation features and educational challenge endpoints have been removed.
 
 ## Windows setup
 
@@ -29,7 +29,7 @@ Open **http://127.0.0.1:5173**:
 - `/admin`: administrator-only login monitoring.
 - `/admin/settings`: administrator-only security policy and account creation.
 
-Existing bookmarked `/admin/login` and `/instructor` routes map to the new login and administrator monitoring views. The old account store was only an in-memory teaching fixture, so there are no genuine accounts to migrate. No competing identity provider was found in the repository.
+Administrator sign-in is available at `/admin/login` and opens monitoring after authentication. The legacy `/instructor` route opens administrator monitoring.
 
 The frontend binds to `127.0.0.1:5173` and proxies `/api` to the backend at `127.0.0.1:3001`. Both ports are strict and the backend always binds to loopback. Stop the services with Ctrl+C.
 
@@ -44,7 +44,7 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:3001**. The start command automatically uses that local origin unless you explicitly configure `TRUSTED_ORIGINS`. Both local startup modes are verified. No automatic publication or deployment is performed.
+Open **http://127.0.0.1:3001**. The start command automatically uses that local origin unless you explicitly configure `TRUSTED_ORIGINS`. Both local startup modes are verified. These local commands do not publish the application. The connected Netlify site automatically builds and publishes changes pushed to the GitHub repository's main branch.
 
 ## Configuration and persistence
 
@@ -104,7 +104,11 @@ npm run build
 
 Automated tests create only isolated temporary SQLite fixtures and remove them afterward. They verify registration roles, salted hashing, one-time administrator setup, generic errors, password-free audit/database/API data, page/API authorization, session hashing/expiry/logout, CSRF/Origin/Host/size checks, IP/account rate limiting, lockout and expiry, alerts, retention/filtering/pagination, authorized SSE/logout, proxy trust, and database persistence. Tests do not seed the application's database.
 
-Verification completed: all 19 automated tests pass; frontend, backend, and test TypeScript checks pass; the production build passes; database initialization and the hidden-password administrator command pass. Browser verification uses an isolated temporary database, separate from the application store. The UI is checked for registration/login/logout, protected account pages, administrator access, redacted live activity, policy saving, account creation, and mobile layout. Registration, login/logout, protected account access, standard-user rejection from administrator pages, administrator account creation and policy saving, redacted audit details, filters and empty states, and the mobile dashboard were verified. The mobile viewport had no horizontal overflow. SSE delivery, logout invalidation, and open-stream expiry are verified by the automated HTTP tests. A final attempt to reopen the existing browser error-page tab was blocked by its URL policy; use the documented local URL directly.
+Latest verification: **all 30 automated tests pass**, TypeScript checks pass, and the production build succeeds. Tests use isolated SQLite fixtures, an in-memory PostgreSQL emulator, and mocked device-location providers. They do not seed accounts or positions into the application.
+
+Additional location coverage verifies trusted IP metadata, optional consent, bounded coordinates, stale positions, permission denial, high-accuracy failure with standard-position fallback, cancellation, late callbacks, and watchdog timeouts.
+
+Live checks confirmed administrator login/logout, genuine audit updates, protected monitoring, the IP-based OpenStreetMap display, published permission help, and successful login after a device-location timeout. The in-app browser did not return a real device position; successful acquisition there remains unverified. Automated tests validate position handling but cannot prove GPS availability on a user's device.
 
 ## Netlify deployment
 
@@ -135,20 +139,32 @@ Administrator sign-in is available at `/admin/login`. Successful administrator a
 
 If the username chosen during initial administrator setup already belongs to a registered account, setup promotes that existing account, securely replaces its password with the entered password, and invalidates its prior sessions. This is available only through the local one-time setup command before any administrator exists.
 
-Hosted verification: Netlify initially published commit c518a4f with one server function and one schema-only database migration. The authorized administrator account was transferred privately using its existing salt and hash; no plaintext password, sessions, or audit history were transferred. Hosted administrator login, monitoring, redacted audit metadata, administration-page loading, logout, post-logout redirects, and anonymous rejection by the protected monitoring APIs were verified. The portal owner confirmed rotation of both database connection credentials after a dashboard reveal appeared in diagnostic output; temporary local connection-secret files were deleted.
 
 ## Login location and free maps
 
 New hosted login attempts record the location supplied by [Netlify's included Functions geo API](https://docs.netlify.com/build/functions/api/): city, region, country and approximate coordinates when available. No API key or separate paid geolocation service is required. IP geolocation describes the network's estimated location, not an exact address or the device's GPS position; VPNs and mobile networks can produce different locations. Coordinates are rounded to two decimals. Local/private IPs show location unavailable, and existing audit history is not backfilled.
 
-Only administrators can view location data, which expires with the associated audit record under the configured retention limit. Browsers cannot submit or override location metadata. Selecting Show map loads an [OpenStreetMap embed](https://wiki.openstreetmap.org/wiki/Export), with attribution and a link to open the map. This sends the approximate map coordinates to OpenStreetMap; it never sends usernames, passwords, account IDs or audit records. The map uses no API key and depends on OpenStreetMap's public service availability. The dashboard works when the map cannot load.
+Only administrators can view location data, which expires with the associated audit record under the configured retention limit. Browsers cannot submit or override trusted IP-location metadata. Optional browser-reported device positions are stored and displayed separately. Selecting Show map loads an [OpenStreetMap embed](https://wiki.openstreetmap.org/wiki/Export), with attribution and a link to open the map. This sends the approximate map coordinates to OpenStreetMap; it never sends usernames, passwords, account IDs or audit records. The map uses no API key and depends on OpenStreetMap's public service availability. The dashboard works when the map cannot load.
 
 ## Optional device position at sign-in
 
-Sign-in pages offer an explicit Share device location button, off by default. This uses the browser's free Geolocation API once, with high accuracy requested, no cached position and a 12-second high-accuracy attempt followed, when unavailable or timed out, by a 20-second standard-position attempt. It does not track movement, request location on page load, or store coordinates in browser storage. Declining, cancelling or failing permission does not prevent login. A location is sent only with the login attempt after the user chooses to share; registration sends no device position.
+Both account and administrator sign-in pages offer **Share device location**, off by default. Choose it before submitting a login and grant the browser's Location permission. **Cancel location request** stops waiting; **Remove location** excludes an acquired position from the login.
+
+The free browser Geolocation API requests a fresh high-accuracy position with a 12-second timeout. Unavailable or timed-out results retry standard positioning with a 20-second timeout. Independent 18- and 22-second watchdogs bound waits if the browser never responds. Permission denial is not retried automatically. No movement tracking, background collection, page-load location requests, or browser-storage persistence occurs.
+
+A device position is sent only with a submitted login attempt after the user chooses to share. Registration sends no position. Declining, cancelling or failing permission never prevents login; the available IP estimate remains. Device data follows the audit record's administrator-only access and retention policy.
 
 The administrator's login details keep browser-reported coordinates and accuracy radius separate from trusted Netlify IP metadata. Device data is client supplied and can be spoofed; it is not used for authentication, authorization or evidence of an exact physical location. The browser may use GPS, Wi-Fi or other methods and precision is not guaranteed. Server validation requires explicit consent, finite bounded coordinates and nonnegative accuracy, and ignores positions older than five minutes. Coordinates are retained to six decimal places with the audit's existing retention policy. Existing records remain intact.
 
 Device maps load only after Show device map is clicked. A notice explains that this shares the device coordinates with OpenStreetMap. No additional API key or paid service is required. Geolocation requires HTTPS (or a secure local loopback context) and device/browser support. See [browser location documentation](https://developer.mozilla.org/en-US/docs/Web/API/Geolocation/getCurrentPosition).
 
-Location troubleshooting: a permission-denied result means the browser or operating system blocks Location. Enable it in the site's browser permissions and the device's Location settings before retrying. The application cannot reset those permissions. Provider failures retry standard positioning; a watchdog bounds waits when a browser never calls back, and cancellation prevents late coordinates from being submitted.
+### Location troubleshooting
+
+| Message or situation | What to do |
+| --- | --- |
+| Permission blocked or declined | Allow **Location** in this site's browser permissions, reload, then retry. The website cannot reset a denied permission. |
+| Position unavailable or both attempts timed out | Enable device location services and browser access. On Windows, check Settings > Privacy & security > Location, including access for desktop apps. |
+| Embedded browser cannot return a position | Open [Digital_Vault](https://my-digital-vault.netlify.app/login) in Chrome, Edge or a phone browser with location permission enabled. |
+| No device position shared | Sign-in still works; monitoring displays the available IP estimate. |
+
+The button's **Location not working?** section provides these instructions and opens automatically after permission denial. The dashboard labels device positions as browser-reported and displays their reported accuracy radius. An IP address cannot supply an exact physical address, and a device position is not guaranteed to be exact.
