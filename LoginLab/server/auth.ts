@@ -1,8 +1,5 @@
-import {
-  randomBytes,
-  randomUUID,
-  timingSafeEqual,
-} from "node:crypto";
+import { storedLocation, type LoginLocation } from "./location.js";
+import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { Store } from "./store.js";
 import { safeUsername, type Policy } from "./config.js";
 export type User = {
@@ -29,6 +26,7 @@ export type AuditInput = {
   status: number;
   durationMs: number;
   controls: string[];
+  location?: LoginLocation | null;
 };
 export { fingerprint, passwordHash } from "./password.js";
 import { fingerprint, passwordHash } from "./password.js";
@@ -59,7 +57,12 @@ export class Auth {
   ) {
     const salt = randomBytes(32).toString("hex");
     const hash = (await passwordHash(password, salt)).toString("hex");
-    const user: User = { id: randomUUID(), username, role, createdAt: this.now() };
+    const user: User = {
+      id: randomUUID(),
+      username,
+      role,
+      createdAt: this.now(),
+    };
     this.store.db.exec("BEGIN IMMEDIATE");
     try {
       if (
@@ -70,13 +73,21 @@ export class Auth {
       )
         throw new Error("Administrator setup is already complete.");
       const existing = initialAdmin
-        ? this.store.db.prepare("SELECT id,created_at FROM users WHERE username=?").get(username) as { id: string; created_at: number } | undefined
+        ? (this.store.db
+            .prepare("SELECT id,created_at FROM users WHERE username=?")
+            .get(username) as { id: string; created_at: number } | undefined)
         : undefined;
       if (existing) {
         user.id = existing.id;
         user.createdAt = existing.created_at;
-        this.store.db.prepare("UPDATE users SET salt=?,password_hash=?,role='admin' WHERE id=?").run(salt, hash, existing.id);
-        this.store.db.prepare("DELETE FROM sessions WHERE user_id=?").run(existing.id);
+        this.store.db
+          .prepare(
+            "UPDATE users SET salt=?,password_hash=?,role='admin' WHERE id=?",
+          )
+          .run(salt, hash, existing.id);
+        this.store.db
+          .prepare("DELETE FROM sessions WHERE user_id=?")
+          .run(existing.id);
         this.store.db.exec("COMMIT");
         return user;
       }
@@ -268,7 +279,9 @@ export class Auth {
         n: number;
       }
     ).n;
-    db.prepare("INSERT INTO audit VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(
+    db.prepare(
+      "INSERT INTO audit(id,sequence,timestamp,username,account_id,ip,user_agent,outcome,status,duration_ms,controls,location) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+    ).run(
       input.id,
       sequence,
       this.now(),
@@ -280,6 +293,7 @@ export class Auth {
       input.status,
       Math.round(Math.max(0, input.durationMs) * 100) / 100,
       JSON.stringify(input.controls),
+      input.location ? JSON.stringify(input.location) : null,
     );
     this.store.pruneAudit(this.store.policy().retentionLimit);
     this.onAudit();
@@ -331,6 +345,7 @@ export class Auth {
         durationMs: row.duration_ms,
         controls: JSON.parse(row.controls as string),
         password: "[REDACTED]",
+        location: storedLocation(row.location),
       })),
       total,
       page: query.page,

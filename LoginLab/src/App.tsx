@@ -1,3 +1,7 @@
+import LoginLocation, {
+  locationName,
+  type AuditLocation,
+} from "./components/LoginLocation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Shield,
@@ -41,6 +45,7 @@ type Event = {
   durationMs: number;
   controls: string[];
   password: "[REDACTED]";
+  location: AuditLocation | null;
 };
 type Audit = {
   events: Event[];
@@ -704,8 +709,9 @@ export default function App() {
                     <hr />
                     <h3>Privacy and security</h3>
                     <p>
-                      Sign-in attempts are recorded for account security.
-                      Passwords are never included in these records.
+                      Sign-in attempts and approximate network locations are
+                      recorded for account security. Passwords are never
+                      included in these records.
                     </p>
                     <a href={adminSignIn ? "/login" : "/admin/login"}>
                       {adminSignIn
@@ -922,6 +928,11 @@ export default function App() {
                                   >
                                     {event.status} · {event.outcome}
                                   </span>
+                                  {event.location && (
+                                    <span className="event-location">
+                                      {locationName(event.location)}
+                                    </span>
+                                  )}
                                   <span className="muted">
                                     {event.durationMs} ms
                                   </span>
@@ -963,6 +974,10 @@ export default function App() {
                                     </div>
                                   ))}
                                 </div>
+                                <LoginLocation
+                                  location={event.location || null}
+                                  ip={event.ip}
+                                />
                               </details>
                             ))}
                             {audit.events.length === 0 && (

@@ -20,6 +20,15 @@ export class Store {
  CREATE INDEX IF NOT EXISTS audit_time ON audit(timestamp); CREATE INDEX IF NOT EXISTS audit_outcome ON audit(outcome);
  CREATE TABLE IF NOT EXISTS settings(id INTEGER PRIMARY KEY CHECK(id=1),policy TEXT NOT NULL);
  PRAGMA user_version=1;`);
+    if (
+      !this.db
+        .prepare("PRAGMA table_info(audit)")
+        .all()
+        .some((column) => column.name === "location")
+    ) {
+      this.db.exec("ALTER TABLE audit ADD COLUMN location TEXT");
+    }
+    this.db.exec("PRAGMA user_version=2");
     this.db
       .prepare("INSERT OR IGNORE INTO settings(id,policy) VALUES(1,?)")
       .run(JSON.stringify(initial));

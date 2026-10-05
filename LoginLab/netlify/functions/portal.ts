@@ -29,8 +29,15 @@ async function portal(context: Context) {
           ].filter((s): s is string => !!s),
         ),
       ];
-      const html = await readFile(path.join(process.cwd(), "dist", "index.html"), "utf8")
-        .catch(() => readFile(path.join(process.cwd(), "LoginLab", "dist", "index.html"), "utf8"));
+      const html = await readFile(
+        path.join(process.cwd(), "dist", "index.html"),
+        "utf8",
+      ).catch(() =>
+        readFile(
+          path.join(process.cwd(), "LoginLab", "dist", "index.html"),
+          "utf8",
+        ),
+      );
       return new CloudPortal(pool, origins, html);
     })().catch((e) => {
       service = undefined;
@@ -42,7 +49,9 @@ async function portal(context: Context) {
 export default async function handler(request: Request, context: Context) {
   try {
     // Netlify supplies context.ip. Never use browser-supplied forwarded headers.
-    return await (await portal(context)).handle(request, context.ip || "unknown");
+    return await (
+      await portal(context)
+    ).handle(request, context.ip || "unknown", context.geo);
   } catch {
     return new Response(
       JSON.stringify({ message: "The service is temporarily unavailable." }),

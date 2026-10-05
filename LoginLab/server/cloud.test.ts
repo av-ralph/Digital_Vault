@@ -31,6 +31,15 @@ function fixture() {
       "utf8",
     ),
   );
+  db.public.none(
+    readFileSync(
+      new URL(
+        "../netlify/database/migrations/0002_login_location.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
   const adapter = db.adapters.createPg(),
     pool = new adapter.Pool() as Pool;
   let clock = Date.now();
@@ -46,6 +55,7 @@ function fixture() {
     route: string,
     body?: unknown,
     extra: Record<string, string> = {},
+    context: { ip?: string; geo?: unknown } = {},
   ) {
     const response = await portal.handle(
       new Request("https://digital-vault.example" + route, {
@@ -63,7 +73,8 @@ function fixture() {
         },
         body: body === undefined ? undefined : JSON.stringify(body),
       }),
-      "127.0.0.1",
+      context.ip || "127.0.0.1",
+      context.geo,
     );
     for (const entry of response.headers.getSetCookie()) {
       const [name, value] = entry.split(";")[0].split("=");
@@ -254,6 +265,57 @@ test("hosted IP rate limits are stored in the database; users and administrator 
     });
     assert.equal(audit.events.length, 31);
     assert.deepEqual(audit.events[0].controls, ["ip_rate_limit"]);
+  } finally {
+    await f.pool.end();
+  }
+});
+
+test("hosted login records trusted approximate location and ignores browser supplied location headers", async () => {
+  const f = fixture();
+  try {
+    await f.request("/api/session");
+    const password = secret();
+    await f.request("/api/register", { username: "location-user", password });
+    assert.equal((await f.pool.query("SELECT * FROM audit")).rows.length, 0);
+    await f.request("/api/logout", {});
+    await f.request("/api/session");
+    const geo = {
+      city: "Manila",
+      subdivision: { name: "Metro Manila" },
+      country: { name: "Philippines", code: "PH" },
+      latitude: 14.599512,
+      longitude: 120.984222,
+    };
+    assert.equal(
+      (
+        await f.request(
+          "/api/login",
+          { username: "location-user", password },
+          {},
+          { ip: "8.8.8.8", geo },
+        )
+      ).status,
+      200,
+    );
+    let rows = (await f.pool.query("SELECT * FROM audit")).rows;
+    const saved = JSON.parse(rows[0].location);
+    assert.equal(saved.city, "Manila");
+    assert.equal(saved.region, "Metro Manila");
+    assert.equal(saved.latitude, 14.6);
+    assert.equal(saved.longitude, 120.98);
+    assert.equal(saved.accuracy, "approximate");
+    assert.equal(JSON.stringify(rows).includes(password), false);
+    await f.request("/api/logout", {});
+    await f.request("/api/session");
+    await f.request(
+      "/api/login",
+      { username: "location-user", password },
+      { "X-City": "Spoofed", "X-Forwarded-For": "8.8.8.8" },
+      { ip: "127.0.0.1", geo },
+    );
+    rows = (await f.pool.query("SELECT * FROM audit")).rows;
+    assert.equal(rows[1].location, null);
+    assert.equal(rows.length, 2);
   } finally {
     await f.pool.end();
   }

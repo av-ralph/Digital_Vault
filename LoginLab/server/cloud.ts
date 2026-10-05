@@ -1,3 +1,8 @@
+import {
+  locationFromGeo,
+  storedLocation,
+  type LoginLocation,
+} from "./location.js";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
@@ -279,6 +284,7 @@ export class CloudPortal {
       status: number;
       duration: number;
       controls: string[];
+      location?: LoginLocation | null;
     },
     policy: Policy,
   ) {
@@ -287,7 +293,7 @@ export class CloudPortal {
         "audit-retention",
       ]);
       await db.query(
-        "INSERT INTO audit(id,timestamp,username,account_id,ip,user_agent,outcome,status,duration_ms,controls) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "INSERT INTO audit(id,timestamp,username,account_id,ip,user_agent,outcome,status,duration_ms,controls,location) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
         [
           event.id,
           this.now(),
@@ -299,6 +305,7 @@ export class CloudPortal {
           event.status,
           Math.round(event.duration * 100) / 100,
           JSON.stringify(event.controls),
+          event.location ? JSON.stringify(event.location) : null,
         ],
       );
       await db.query(
@@ -352,6 +359,7 @@ export class CloudPortal {
         durationMs: Number(r.duration_ms),
         controls: JSON.parse(r.controls),
         password: "[REDACTED]",
+        location: storedLocation(r.location),
       })),
       total,
       page: query.page,
@@ -384,7 +392,7 @@ export class CloudPortal {
       alertWindowSeconds: policy.alertWindowSeconds,
     };
   }
-  async handle(req: Request, ip = "unknown") {
+  async handle(req: Request, ip = "unknown", geo?: unknown) {
     const started = performance.now(),
       url = new URL(req.url),
       path = url.pathname;
@@ -394,7 +402,7 @@ export class CloudPortal {
       "X-Frame-Options": "DENY",
       "Referrer-Policy": "same-origin",
       "Content-Security-Policy":
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src https://www.openstreetmap.org; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     });
     const cookie = Object.fromEntries(
       (req.headers.get("cookie") || "")
@@ -417,6 +425,7 @@ export class CloudPortal {
       status: 400,
       duration: 0,
       controls: [] as string[],
+      location: locationFromGeo(geo, ip),
     };
     if (loginRequest) headers.set("X-Request-ID", event.id);
     let policy = defaults;
