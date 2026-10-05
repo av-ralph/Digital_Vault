@@ -320,3 +320,68 @@ test("hosted login records trusted approximate location and ignores browser supp
     await f.pool.end();
   }
 });
+
+test("hosted browser position is opt-in, separate from trusted IP metadata, and administrator protected", async () => {
+  const f = fixture();
+  try {
+    await f.request("/api/session");
+    const password = secret(),
+      browserLocation = {
+        consent: true,
+        latitude: 14.599512,
+        longitude: 120.984222,
+        accuracyMeters: 20,
+        collectedAt: Date.now(),
+      };
+    await f.request("/api/register", { username: "position-user", password });
+    await f.request("/api/logout", {});
+    await f.request("/api/session");
+    assert.equal(
+      (
+        await f.request("/api/login", {
+          username: "position-user",
+          password,
+          browserLocation: { ...browserLocation, consent: false },
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await f.request("/api/login", {
+          username: "position-user",
+          password,
+          browserLocation,
+        })
+      ).status,
+      200,
+    );
+    assert.equal((await f.request("/api/admin/audit")).status, 403);
+    let rows = (await f.pool.query("SELECT * FROM audit")).rows;
+    assert.equal(rows[0].location, null);
+    assert.deepEqual(
+      JSON.parse(rows[1].location).browserLocation,
+      browserLocation,
+    );
+    assert.equal(JSON.stringify(rows).includes(password), false);
+    await f.pool.query(
+      "UPDATE users SET role='admin' WHERE username='position-user'",
+    );
+    const audit = await f.request(
+      "/api/admin/audit?page=1&pageSize=20&outcome=all",
+    );
+    assert.deepEqual(audit.data.events[0].browserLocation, browserLocation);
+    assert.equal(audit.data.events[0].location, null);
+    await f.request("/api/logout", {});
+    await f.request("/api/session");
+    await f.request("/api/login", {
+      username: "position-user",
+      password,
+      browserLocation: { ...browserLocation, collectedAt: Date.now() - 600000 },
+    });
+    rows = (await f.pool.query("SELECT * FROM audit")).rows;
+    assert.equal(rows[2].location, null);
+  } finally {
+    await f.pool.end();
+  }
+});

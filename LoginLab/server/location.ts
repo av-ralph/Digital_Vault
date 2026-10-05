@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { isIP } from "node:net";
 
 export type LoginLocation = {
@@ -110,6 +111,57 @@ export function storedLocation(value: unknown): LoginLocation | null {
       latitude: raw.latitude,
       longitude: raw.longitude,
     });
+  } catch {
+    return null;
+  }
+}
+
+export const browserLocationSchema = z
+  .object({
+    consent: z.literal(true),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+    accuracyMeters: z.number().min(0).max(10000000),
+    collectedAt: z.number().int().positive(),
+  })
+  .strict();
+export type BrowserLocation = z.infer<typeof browserLocationSchema>;
+export function freshBrowserLocation(
+  value: unknown,
+  now: number,
+): BrowserLocation | null {
+  const parsed = browserLocationSchema.safeParse(value);
+  if (
+    !parsed.success ||
+    parsed.data.collectedAt < now - 300000 ||
+    parsed.data.collectedAt > now + 30000
+  )
+    return null;
+  return {
+    ...parsed.data,
+    latitude: Number(parsed.data.latitude.toFixed(6)),
+    longitude: Number(parsed.data.longitude.toFixed(6)),
+    accuracyMeters: Math.ceil(parsed.data.accuracyMeters),
+  };
+}
+export function auditLocation(
+  ip: LoginLocation | null | undefined,
+  browser: BrowserLocation | null | undefined,
+) {
+  return ip || browser
+    ? JSON.stringify({
+        ...ip,
+        ...(browser ? { browserLocation: browser } : {}),
+      })
+    : null;
+}
+export function storedBrowserLocation(value: unknown): BrowserLocation | null {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = browserLocationSchema.safeParse(
+      JSON.parse(value).browserLocation,
+    );
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }

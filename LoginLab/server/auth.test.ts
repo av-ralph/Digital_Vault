@@ -861,22 +861,92 @@ test("administrator SSE authorization expires while the stream is open", async (
   }
 });
 
-
 test("initial administrator setup reuses an existing account and invalidates its old access", async () => {
   const f = await fixture();
   try {
-    const oldPassword = secret(), newPassword = secret();
-    const existing = await f.service.auth.createUser("registered-owner", oldPassword);
+    const oldPassword = secret(),
+      newPassword = secret();
+    const existing = await f.service.auth.createUser(
+      "registered-owner",
+      oldPassword,
+    );
     const session = f.service.auth.issueSession(existing.id);
-    const admin = await f.service.auth.createUser("registered-owner", newPassword, "admin", true);
+    const admin = await f.service.auth.createUser(
+      "registered-owner",
+      newPassword,
+      "admin",
+      true,
+    );
     assert.equal(admin.id, existing.id);
     assert.equal(admin.createdAt, existing.createdAt);
     assert.equal(admin.role, "admin");
     assert.equal(f.service.auth.session(session.token), null);
-    const c = f.client(); await c.initialize();
-    assert.equal((await c.request("/api/login", {username: admin.username, password: oldPassword})).status, 401);
-    assert.equal((await c.request("/api/login", {username: admin.username, password: newPassword})).status, 200);
+    const c = f.client();
+    await c.initialize();
+    assert.equal(
+      (
+        await c.request("/api/login", {
+          username: admin.username,
+          password: oldPassword,
+        })
+      ).status,
+      401,
+    );
+    assert.equal(
+      (
+        await c.request("/api/login", {
+          username: admin.username,
+          password: newPassword,
+        })
+      ).status,
+      200,
+    );
     assert.equal((await c.request("/api/admin/settings")).status, 200);
-    await assert.rejects(f.service.auth.createUser("registered-owner", secret(), "admin", true));
-  } finally { await f.close(); }
+    await assert.rejects(
+      f.service.auth.createUser("registered-owner", secret(), "admin", true),
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+test("local login accepts an optional consented device position without changing socket IP or leaking credentials", async () => {
+  const f = await fixture();
+  try {
+    const c = f.client();
+    await c.initialize();
+    const password = secret(),
+      browserLocation = {
+        consent: true,
+        latitude: 0,
+        longitude: 0,
+        accuracyMeters: 25,
+        collectedAt: Date.now(),
+      };
+    await c.request("/api/register", { username: "position-user", password });
+    assert.equal(
+      (
+        await c.request("/api/login", {
+          username: "position-user",
+          password,
+          browserLocation,
+        })
+      ).status,
+      200,
+    );
+    const audit = f.service.auth.audit({
+      page: 1,
+      pageSize: 20,
+      outcome: "all",
+      username: "",
+    });
+    assert.deepEqual(audit.events[0].browserLocation, browserLocation);
+    assert.equal(audit.events[0].ip, "127.0.0.1");
+    assert.equal(audit.events[0].location, null);
+    assert.equal(audit.events[0].password, "[REDACTED]");
+    assert.equal(JSON.stringify(audit).includes(password), false);
+    assert.equal((await c.request("/api/admin/audit")).status, 403);
+  } finally {
+    await f.close();
+  }
 });

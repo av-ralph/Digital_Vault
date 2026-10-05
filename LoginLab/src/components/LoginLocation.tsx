@@ -75,7 +75,7 @@ export default function LoginLocation({
   return (
     <section className="location-panel" aria-label="Login location">
       <div className="location-heading">
-        <h3>Approximate location</h3>
+        <h3>IP-based location estimate</h3>
         <span className="badge">IP estimate</span>
       </div>
       <p className="location-name">{name}</p>
@@ -130,8 +130,7 @@ export default function LoginLocation({
         </p>
       )}
       <p className="caption">
-        Location source: {location.source}. Map: OpenStreetMap. No API key
-        required.
+        Location source: {location.source}. Map: OpenStreetMap.
       </p>
     </section>
   );

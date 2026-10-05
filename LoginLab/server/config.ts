@@ -1,3 +1,4 @@
+import { browserLocationSchema } from "./location.js";
 import { z } from "zod";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -97,7 +98,11 @@ export const registrationSchema = z
   .object({ username: usernameSchema, password: z.string().min(15).max(128) })
   .strict();
 export const loginSchema = z
-  .object({ username: usernameSchema, password: z.string().min(1).max(128) })
+  .object({
+    username: usernameSchema,
+    password: z.string().min(1).max(128),
+    browserLocation: browserLocationSchema.optional(),
+  })
   .strict();
 export function safeUsername(input: unknown) {
   return typeof input === "string"

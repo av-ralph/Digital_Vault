@@ -1,4 +1,8 @@
 import {
+  auditLocation,
+  storedBrowserLocation,
+  freshBrowserLocation,
+  type BrowserLocation,
   locationFromGeo,
   storedLocation,
   type LoginLocation,
@@ -285,6 +289,7 @@ export class CloudPortal {
       duration: number;
       controls: string[];
       location?: LoginLocation | null;
+      browserLocation?: BrowserLocation | null;
     },
     policy: Policy,
   ) {
@@ -305,7 +310,7 @@ export class CloudPortal {
           event.status,
           Math.round(event.duration * 100) / 100,
           JSON.stringify(event.controls),
-          event.location ? JSON.stringify(event.location) : null,
+          auditLocation(event.location, event.browserLocation),
         ],
       );
       await db.query(
@@ -360,6 +365,7 @@ export class CloudPortal {
         controls: JSON.parse(r.controls),
         password: "[REDACTED]",
         location: storedLocation(r.location),
+        browserLocation: storedBrowserLocation(r.location),
       })),
       total,
       page: query.page,
@@ -400,6 +406,7 @@ export class CloudPortal {
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
       "X-Frame-Options": "DENY",
+      "Permissions-Policy": "geolocation=(self)",
       "Referrer-Policy": "same-origin",
       "Content-Security-Policy":
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src https://www.openstreetmap.org; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
@@ -426,6 +433,7 @@ export class CloudPortal {
       duration: 0,
       controls: [] as string[],
       location: locationFromGeo(geo, ip),
+      browserLocation: null as BrowserLocation | null,
     };
     if (loginRequest) headers.set("X-Request-ID", event.id);
     let policy = defaults;
@@ -613,6 +621,10 @@ export class CloudPortal {
             event.controls.push("input_validation");
             return json({ message: generic, error: "login_failed" }, 400);
           }
+          event.browserLocation = freshBrowserLocation(
+            data.data.browserLocation,
+            this.now(),
+          );
           const result = await this.login(
             data.data.username,
             data.data.password,

@@ -55,3 +55,49 @@ test("missing, malformed and invalid coordinates produce honest unavailable stat
   assert.equal(location.latitude, null);
   assert.equal(location.longitude, null);
 });
+
+test("browser position requires explicit consent, valid bounds and a recent timestamp", async () => {
+  const { freshBrowserLocation, auditLocation, storedBrowserLocation } =
+    await import("./location.js");
+  const now = Date.now(),
+    position = {
+      consent: true,
+      latitude: 14.59951234,
+      longitude: 120.98422212,
+      accuracyMeters: 18.2,
+      collectedAt: now,
+    };
+  assert.equal(
+    freshBrowserLocation({ ...position, consent: false }, now),
+    null,
+  );
+  assert.equal(freshBrowserLocation({ ...position, latitude: 91 }, now), null);
+  assert.equal(
+    freshBrowserLocation({ ...position, accuracyMeters: -1 }, now),
+    null,
+  );
+  assert.equal(
+    freshBrowserLocation({ ...position, collectedAt: now - 300001 }, now),
+    null,
+  );
+  assert.equal(
+    freshBrowserLocation({ ...position, collectedAt: now + 30001 }, now),
+    null,
+  );
+  assert.equal(
+    freshBrowserLocation({ ...position, extra: "not allowed" }, now),
+    null,
+  );
+  const accepted = freshBrowserLocation(position, now)!;
+  assert.equal(accepted.latitude, 14.599512);
+  assert.equal(accepted.accuracyMeters, 19);
+  const stored = auditLocation(null, accepted);
+  assert.deepEqual(storedBrowserLocation(stored), accepted);
+  assert.equal(storedLocation(stored), null);
+  assert.equal(
+    storedBrowserLocation(
+      auditLocation(locationFromGeo({ city: "Manila" }, "8.8.8.8"), null),
+    ),
+    null,
+  );
+});

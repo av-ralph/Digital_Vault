@@ -1,4 +1,10 @@
-import { storedLocation, type LoginLocation } from "./location.js";
+import {
+  auditLocation,
+  storedBrowserLocation,
+  storedLocation,
+  type BrowserLocation,
+  type LoginLocation,
+} from "./location.js";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { Store } from "./store.js";
 import { safeUsername, type Policy } from "./config.js";
@@ -27,6 +33,7 @@ export type AuditInput = {
   durationMs: number;
   controls: string[];
   location?: LoginLocation | null;
+  browserLocation?: BrowserLocation | null;
 };
 export { fingerprint, passwordHash } from "./password.js";
 import { fingerprint, passwordHash } from "./password.js";
@@ -293,7 +300,7 @@ export class Auth {
       input.status,
       Math.round(Math.max(0, input.durationMs) * 100) / 100,
       JSON.stringify(input.controls),
-      input.location ? JSON.stringify(input.location) : null,
+      auditLocation(input.location, input.browserLocation),
     );
     this.store.pruneAudit(this.store.policy().retentionLimit);
     this.onAudit();
@@ -346,6 +353,7 @@ export class Auth {
         controls: JSON.parse(row.controls as string),
         password: "[REDACTED]",
         location: storedLocation(row.location),
+        browserLocation: storedBrowserLocation(row.location),
       })),
       total,
       page: query.page,

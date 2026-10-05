@@ -1,3 +1,7 @@
+import DeviceLocation, {
+  OptionalLocation,
+  type BrowserLocation,
+} from "./components/DeviceLocation";
 import LoginLocation, {
   locationName,
   type AuditLocation,
@@ -46,6 +50,7 @@ type Event = {
   controls: string[];
   password: "[REDACTED]";
   location: AuditLocation | null;
+  browserLocation: BrowserLocation | null;
 };
 type Audit = {
   events: Event[];
@@ -149,6 +154,9 @@ export default function App() {
     [revision, setRevision] = useState(0),
     [clock, setClock] = useState(Date.now());
   const csrf = useRef("");
+  const [browserLocation, setBrowserLocation] =
+    useState<BrowserLocation | null>(null);
+  const [locationReset, setLocationReset] = useState(0);
   const [audit, setAudit] = useState<Audit | null>(null),
     [summary, setSummary] = useState<Summary | null>(null),
     [auditLoading, setAuditLoading] = useState(false),
@@ -365,7 +373,14 @@ export default function App() {
     const result = await submit(page === "/register" ? "/register" : "/login", {
       username,
       password,
+      ...(page !== "/register" &&
+      browserLocation &&
+      Date.now() - browserLocation.collectedAt <= 300000
+        ? { browserLocation }
+        : {}),
     });
+    setBrowserLocation(null);
+    setLocationReset((v) => v + 1);
     if (result && page !== "/register") {
       if (adminSignIn && result.user.role !== "admin") {
         setSession({
@@ -633,6 +648,13 @@ export default function App() {
                               Use 15–128 characters. Spaces are allowed. Never
                               reuse a password from another service.
                             </small>
+                          )}
+                          {!registration && (
+                            <OptionalLocation
+                              key={locationReset}
+                              onChange={setBrowserLocation}
+                              disabled={busy}
+                            />
                           )}
                           <button
                             className="full"
@@ -974,6 +996,9 @@ export default function App() {
                                     </div>
                                   ))}
                                 </div>
+                                <DeviceLocation
+                                  location={event.browserLocation || null}
+                                />
                                 <LoginLocation
                                   location={event.location || null}
                                   ip={event.ip}

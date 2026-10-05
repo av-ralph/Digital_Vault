@@ -1,3 +1,4 @@
+import { freshBrowserLocation } from "./location.js";
 import express from "express";
 import { z } from "zod";
 import path from "node:path";
@@ -69,6 +70,7 @@ export function createApp(
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "same-origin");
     res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Permissions-Policy", "geolocation=(self)");
     res.setHeader(
       "Content-Security-Policy",
       "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src https://www.openstreetmap.org; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
@@ -252,6 +254,10 @@ export function createApp(
         .status(400)
         .json({ error: "login_failed", message: genericLogin });
     }
+    res.locals.audit.browserLocation = freshBrowserLocation(
+      body.data.browserLocation,
+      now(),
+    );
     const result = await auth.login(
       body.data.username,
       body.data.password,
